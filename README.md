@@ -222,7 +222,7 @@ AstrBot 管理面板 → 插件 → mi_health → 配置:
 ## 常见问题
 
 **Q: token 过期了怎么办?**
-A: 重跑扫码登录脚本生成新 token,覆盖旧文件即可。`/health status` 能检测到过期。
+A: **最省事的办法**: 进到 `data/plugins/mi_health/tools/` 目录, 双击 `刷新token.bat`, 用小号手机微信扫二维码, 新 token 会自动覆盖到配置的路径。然后去 AstrBot 面板点插件「重新加载」即可。详见 [tools/README.md](./tools/README.md)。
 
 **Q: 数据延迟多少?**
 A: 手环 → 小米云端本身有几秒~几分钟延迟,插件再加 10 分钟缓存。想更新鲜就调小 `cache_ttl` 或用 `/health refresh`。
@@ -295,6 +295,32 @@ Token 从两种地方拿:
 - **一定开 Token 校验**,否则同一局域网的任何人扫到端口就能看你的隐私数据
 - 手机不要在公共 Wi-Fi 下打开这个链接
 - 如果只想本机浏览器访问,把 `web_host` 改成 `127.0.0.1`,别人就完全访问不到
+
+---
+
+## 🔄 日常维护:token 过期怎么办
+
+token 过期是最常见的问题（小米云端有效期不固定, 可能几个月也可能几周）。
+
+**最省事**: 双击 `tools/刷新token.bat` → 小号手机微信扫码 → 完事。
+
+具体流程:
+
+1. 进到 `data/plugins/mi_health/tools/` 目录
+2. 双击 `刷新token.bat`
+3. 会自动使用 AstrBot 的 `.venv` 环境, 备份旧 token, 在终端里打印二维码
+4. **用小号手机**的微信/系统相机扫码 (⚠️ 不能用小米运动健康 App 内的扫一扫)
+5. 二维码 5 分钟内有效, 手机点"允许登录"
+6. 新 token 自动覆盖到配置里的路径
+7. 回 AstrBot 面板点 mi_health 插件「重新加载」
+
+**怎么知道该刷新了?**
+
+- 对话里发 `/health status`, 显示过期
+- `/health` 系列指令报 401 / 未授权
+- 插件日志里出现 `AuthError` 或 `token expired`
+
+更多说明见 [tools/README.md](./tools/README.md)。
 
 ---
 
