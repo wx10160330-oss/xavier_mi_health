@@ -186,28 +186,28 @@ class MiHealthPlugin(Star):
             return await self.cache.stale()
 
     # =====================================================
-    # 指令
+    # 指令族
     # =====================================================
-    @filter.command_group("health")
-    def health_group(self):
-        """健康数据查询指令族。"""
+    @filter.command_group("mihealth")
+    def mihealth_group(self):
+        """小米健康数据查询指令族。"""
         pass
 
-    @health_group.command("")
+    @mihealth_group.command("all")
     async def cmd_health_all(self, event: AstrMessageEvent):
-        """/health 查询今日全部健康数据"""
+        """/mihealth all 查询今日全部健康数据"""
         if not self.client:
             yield event.plain_result("插件还没配置好(缺 token 或 UID),先去配置里填一下~")
             return
         snap = await self._fetch_snapshot()
         if not snap:
-            yield event.plain_result("查不到数据,可能是 token 过期或亲友授权没开,可以 /health status 看看")
+            yield event.plain_result("查不到数据,可能是 token 过期或亲友授权没开,可以 /mihealth status 看看")
             return
         yield event.plain_result(fmt.format_full(snap))
 
-    @health_group.command("steps")
+    @mihealth_group.command("steps")
     async def cmd_health_steps(self, event: AstrMessageEvent):
-        """/health steps 查看步数"""
+        """/mihealth steps 查看步数"""
         if not self.client:
             yield event.plain_result("插件未配置")
             return
@@ -217,9 +217,9 @@ class MiHealthPlugin(Star):
             return
         yield event.plain_result("👣 " + fmt.format_steps(snap.get("steps")))
 
-    @health_group.command("hr")
+    @mihealth_group.command("hr")
     async def cmd_health_hr(self, event: AstrMessageEvent):
-        """/health hr 查看心率"""
+        """/mihealth hr 查看心率"""
         if not self.client:
             yield event.plain_result("插件未配置")
             return
@@ -229,9 +229,9 @@ class MiHealthPlugin(Star):
             return
         yield event.plain_result("❤️ " + fmt.format_heart_rate(snap.get("heart_rate")))
 
-    @health_group.command("sleep")
+    @mihealth_group.command("sleep")
     async def cmd_health_sleep(self, event: AstrMessageEvent):
-        """/health sleep 查看昨晚睡眠"""
+        """/mihealth sleep 查看昨晚睡眠"""
         if not self.client:
             yield event.plain_result("插件未配置")
             return
@@ -241,9 +241,9 @@ class MiHealthPlugin(Star):
             return
         yield event.plain_result("😴 " + fmt.format_sleep(snap.get("sleep")))
 
-    @health_group.command("spo2")
+    @mihealth_group.command("spo2")
     async def cmd_health_spo2(self, event: AstrMessageEvent):
-        """/health spo2 查看血氧"""
+        """/mihealth spo2 查看血氧"""
         if not self.client:
             yield event.plain_result("插件未配置")
             return
@@ -254,9 +254,9 @@ class MiHealthPlugin(Star):
         text = fmt.format_spo2(snap.get("spo2"))
         yield event.plain_result("🫁 " + text if text else "🫁 血氧: 暂无数据(可能手环未开启或SDK不支持)")
 
-    @health_group.command("vitality")
+    @mihealth_group.command("vitality")
     async def cmd_health_vitality(self, event: AstrMessageEvent):
-        """/health vitality 查看活力指标(中高强度活动时长)"""
+        """/mihealth vitality 查看活力指标(中高强度活动时长)"""
         if not self.client:
             yield event.plain_result("插件未配置")
             return
@@ -270,9 +270,9 @@ class MiHealthPlugin(Star):
         text = fmt.format_vitality(snap.get("vitality"))
         yield event.plain_result("🌟 " + text if text else "🌟 活力: 暂无数据")
 
-    @health_group.command("refresh")
+    @mihealth_group.command("refresh")
     async def cmd_health_refresh(self, event: AstrMessageEvent):
-        """/health refresh 强制刷新缓存"""
+        """/mihealth refresh 强制刷新缓存"""
         if not self.client:
             yield event.plain_result("插件未配置")
             return
@@ -282,9 +282,9 @@ class MiHealthPlugin(Star):
             return
         yield event.plain_result("已刷新 ✅\n" + fmt.format_full(snap))
 
-    @health_group.command("status")
+    @mihealth_group.command("status")
     async def cmd_health_status(self, event: AstrMessageEvent):
-        """/health status 查看插件状态"""
+        """/mihealth status 查看插件状态"""
         lines = [
             f"[{PLUGIN_NAME}] 状态",
             f"token_path  : {'✅ 已设置' if self.token_path else '❌ 未设置'}",
@@ -305,9 +305,9 @@ class MiHealthPlugin(Star):
         yield event.plain_result("\n".join(lines))
 
     # ------- 主动关怀子指令 -------
-    @health_group.command("monitor")
+    @mihealth_group.command("monitor")
     async def cmd_health_monitor(self, event: AstrMessageEvent, action: str = ""):
-        """/health monitor [on|off|status|test|push] 主动关怀开关"""
+        """/mihealth monitor [on|off|status|test|push] 主动关怀开关"""
         act = (action or "").lower().strip()
 
         if act == "push":
