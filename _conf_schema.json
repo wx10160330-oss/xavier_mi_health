@@ -1,0 +1,407 @@
+{
+  "bot_qq_id": {
+    "type": "string",
+    "description": "机器人 QQ 号",
+    "default": "",
+    "hint": "OneBot(aiocqhttp) 平台伪造消息注入所需的机器人 QQ 号。留空会自动从 CQHttp 实例获取；如果自动获取失败，请手动填写。"
+  },
+  "token_path": {
+    "description": "Token 文件路径",
+    "type": "string",
+    "default": "",
+    "hint": "小米小号扫码登录后生成的 token.json 绝对路径。示例：/root/mi-fitness-python/token.json"
+  },
+  "target_uid": {
+    "description": "目标用户 UID",
+    "type": "string",
+    "default": "",
+    "hint": "要查询的大号(本人)小米 UID。留空则默认查小号自己(通常查不到,需要走亲友共享)"
+  },
+  "auto_inject": {
+    "description": "聊天上下文自动注入",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后,每次 LLM 请求前会把健康数据静默塞进系统提示词,让小回作为背景常识感知"
+  },
+  "cache_ttl": {
+    "description": "缓存有效期（秒）",
+    "type": "int",
+    "default": 600,
+    "hint": "健康数据本地缓存秒数,避免频繁调用小米云端。默认 600 秒 = 10 分钟"
+  },
+  "inject_max_length": {
+    "description": "注入文本最大长度",
+    "type": "int",
+    "default": 400,
+    "hint": "注入到 system_prompt 的健康数据文本最大字符数,超出会截断"
+  },
+  "silent_on_error": {
+    "description": "接口失败时静默",
+    "type": "bool",
+    "default": true,
+    "hint": "接口调用失败时是否静默处理(不打断对话)。建议保持开启"
+  },
+  "allowed_session_ids": {
+    "description": "会话白名单",
+    "type": "list",
+    "default": [],
+    "items": {
+      "type": "string"
+    },
+    "hint": "允许查询/推送健康数据的会话 ID 白名单(隐私保护)。留空则所有已启用会话都可用;主动关怀也只推送到白名单里的会话"
+  },
+  "enable_vitality": {
+    "description": "启用活力指标",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后 /health、上下文注入、LLM Tool 会带上『活力』数据(中高强度活动时长,小米健康里的活力评分)"
+  },
+  "monitor_enabled": {
+    "description": "【主动关怀】总开关",
+    "type": "bool",
+    "default": false,
+    "hint": "开启后,插件会在后台定时拉取健康数据,发现异常时主动发消息关心你。默认关闭,需要时打开"
+  },
+  "check_interval": {
+    "description": "轮询间隔（秒）",
+    "type": "int",
+    "default": 900,
+    "hint": "主动关怀 后台轮询间隔。默认 900 秒 = 15 分钟。太短容易被云端限流,太长响应慢"
+  },
+  "stale_threshold_hours": {
+    "description": "数据陈旧阈值（小时）",
+    "type": "int",
+    "default": 2,
+    "hint": "若最新数据超过该小时数没更新(说明你没打开小米健康 App 同步),就静默等待不误报"
+  },
+  "baseline_days": {
+    "description": "基线滚动天数",
+    "type": "int",
+    "default": 7,
+    "hint": "主动关怀 基线建立所需的天数。前 N 天只默默收集数据不告警,避免刚开就误报"
+  },
+  "recent_chat_gap_minutes": {
+    "description": "聊天空窗（分钟）",
+    "type": "int",
+    "default": 10,
+    "hint": "若最近 N 分钟内跟小回说过话,则不主动推送关怀(避免打断正在进行的对话)"
+  },
+  "quiet_hours_enabled": {
+    "description": "启用静默时段",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后,在下面的时段内绝对不会主动推送关怀消息"
+  },
+  "quiet_hours_start": {
+    "description": "静默时段 起点",
+    "type": "string",
+    "default": "23:00",
+    "hint": "HH:MM 格式。支持跨天,如 23:00-07:00 表示晚上 11 点到早上 7 点"
+  },
+  "quiet_hours_end": {
+    "description": "静默时段 终点",
+    "type": "string",
+    "default": "07:00",
+    "hint": "HH:MM 格式"
+  },
+  "heart_rate_care_enabled": {
+    "description": "【心率异常】关怀",
+    "type": "bool",
+    "default": true,
+    "hint": "心率偏离基线时主动关心一句"
+  },
+  "heart_rate_zscore": {
+    "description": "心率异常 敏感度",
+    "type": "float",
+    "default": 2.0,
+    "hint": "z-score 阈值,越大越不敏感。默认 2.0(即偏离基线两个标准差才触发)"
+  },
+  "heart_rate_cooldown_hours": {
+    "description": "心率关怀 冷却（小时）",
+    "type": "int",
+    "default": 4,
+    "hint": "一次心率关怀后,多少小时内不再重复推送"
+  },
+  "sleep_care_enabled": {
+    "description": "【睡眠差】关怀",
+    "type": "bool",
+    "default": true,
+    "hint": "昨晚睡眠评分明显低于平时时主动关心一句"
+  },
+  "sleep_zscore": {
+    "description": "睡眠差 敏感度",
+    "type": "float",
+    "default": 1.5,
+    "hint": "z-score 阈值,越大越不敏感。默认 1.5"
+  },
+  "sleep_cooldown_hours": {
+    "description": "睡眠关怀 冷却（小时）",
+    "type": "int",
+    "default": 8,
+    "hint": "睡眠关怀一天最多一次,默认 8 小时冷却"
+  },
+  "spo2_care_enabled": {
+    "description": "【血氧偏低】关怀",
+    "type": "bool",
+    "default": true,
+    "hint": "血氧低于阈值时主动关心一句"
+  },
+  "spo2_abs_threshold": {
+    "description": "血氧 阈值",
+    "type": "int",
+    "default": 93,
+    "hint": "低于该数值触发。默认 93,一般 95 以上算正常"
+  },
+  "spo2_cooldown_hours": {
+    "description": "血氧关怀 冷却（小时）",
+    "type": "int",
+    "default": 4,
+    "hint": "一次血氧关怀后的冷却时间"
+  },
+  "late_night_care_enabled": {
+    "description": "【熬夜提醒】",
+    "type": "bool",
+    "default": false,
+    "hint": "到点后如果心率还很活跃,劝你早点睡。默认关闭,想被督促再打开"
+  },
+  "late_night_hour": {
+    "description": "熬夜判定时刻",
+    "type": "string",
+    "default": "23:30",
+    "hint": "HH:MM 格式。该时刻后如果心率仍高于日均则触发"
+  },
+  "late_night_cooldown_hours": {
+    "description": "熬夜关怀 冷却（小时）",
+    "type": "int",
+    "default": 6,
+    "hint": "一次熬夜关怀后的冷却时间"
+  },
+  "lazy_step_enabled": {
+    "description": "【步数偷懒】提醒",
+    "type": "bool",
+    "default": false,
+    "hint": "到晚上如果步数还太少,提醒你起来动动。默认关闭"
+  },
+  "lazy_step_check_hour": {
+    "description": "步数偷懒 判定时刻",
+    "type": "string",
+    "default": "20:00",
+    "hint": "HH:MM 格式。到该时刻还没达标就触发"
+  },
+  "lazy_step_threshold": {
+    "description": "步数偷懒 阈值",
+    "type": "int",
+    "default": 2000,
+    "hint": "低于该步数触发。默认 2000"
+  },
+  "care_prompt_template": {
+    "description": "【关怀】注入给 bot 的话（模板）",
+    "type": "text",
+    "default": "你刚扫到她的身体数据，注意到这件事：\n「{hint}」\n请结合你们的对话上下文和你当前的状态，用你自己的口吻自然地关心她，不要生硬复读上面的内容，也不要暴露「系统消息」这几个字。",
+    "hint": "这段文本会被伪装成一条用户消息, 注入到 AstrBot 事件流里, 由当前会话的人格+LLM 自然生成回复发给她。占位符: {hint} 异常描述 / {key} 类型代号 / {time} 当前时间 / {date} 日期。"
+  },
+  "fallback_hr_high": {
+    "description": "【兜底】心率偏高",
+    "type": "string",
+    "default": "宝宝, 心跳有点乱, 是遇到什么事了吗?",
+    "hint": "只在 LLM 挂了/超时才会用到"
+  },
+  "fallback_hr_low": {
+    "description": "【兜底】心率偏低",
+    "type": "string",
+    "default": "宝宝, 心跳有点慢, 感觉还好吗?",
+    "hint": "只在 LLM 挂了/超时才会用到"
+  },
+  "fallback_sleep": {
+    "description": "【兜底】睡眠差",
+    "type": "string",
+    "default": "看你昨晚没睡好, 今天悠着点, 少喝一杯咖啡~",
+    "hint": "只在 LLM 挂了/超时才会用到"
+  },
+  "fallback_spo2": {
+    "description": "【兜底】血氧低",
+    "type": "string",
+    "default": "深呼吸下宝宝, 血氧有点低",
+    "hint": "只在 LLM 挂了/超时才会用到"
+  },
+  "fallback_late_night": {
+    "description": "【兜底】熬夜",
+    "type": "string",
+    "default": "这么晚啦, 该躺下休息啦~",
+    "hint": "只在 LLM 挂了/超时才会用到"
+  },
+  "fallback_lazy_step": {
+    "description": "【兜底】步数偷懒",
+    "type": "string",
+    "default": "今天一点没动喔, 起来溜达一圈嘛?",
+    "hint": "只在 LLM 挂了/超时才会用到"
+  },
+  "web_enabled": {
+    "description": "【前端服务】总开关",
+    "type": "bool",
+    "default": true,
+    "hint": "启用后可以在浏览器/手机浏览器打开一个网页查看健康数据和记录生理期。关闭后前端页面无法访问"
+  },
+  "web_host": {
+    "description": "监听地址",
+    "type": "string",
+    "default": "0.0.0.0",
+    "hint": "0.0.0.0 = 局域网内(如手机同一 Wi-Fi)都能访问; 127.0.0.1 = 只本机能访问,最安全"
+  },
+  "web_port": {
+    "description": "监听端口",
+    "type": "int",
+    "default": 4847,
+    "hint": "如遇端口冲突可换一个,建议 1024-65535 之间"
+  },
+  "web_token_enabled": {
+    "description": "启用 Token 校验",
+    "type": "bool",
+    "default": true,
+    "hint": "强烈建议开启!否则任何知道你 IP 和端口的人都能看你的健康数据和生理期"
+  },
+  "web_token": {
+    "description": "访问 Token",
+    "type": "string",
+    "default": "",
+    "hint": "留空插件启动时会自动生成一串 20 位随机 Token 并写回这里。想换新的就清空后重启插件。首次访问链接:http://本机IP:端口/?k=Token,浏览器会记住,后续不用再带"
+  },
+  "history_enabled": {
+    "description": "【历史归档】",
+    "type": "bool",
+    "default": true,
+    "hint": "每次拉取健康数据时自动归档到本地文件,历史页面会用到"
+  },
+  "history_keep_days": {
+    "description": "历史保留天数",
+    "type": "int",
+    "default": 90,
+    "hint": "超过该天数的旧归档会被自动清理。默认 90 天,想留更久可以调大"
+  },
+  "period_enabled": {
+    "description": "【生理期】功能总开关",
+    "type": "bool",
+    "default": true,
+    "hint": "启用后可以在日历页记录经期、自动预测下次经期和排卵期"
+  },
+  "period_default_cycle": {
+    "description": "默认周期天数",
+    "type": "int",
+    "default": 28,
+    "hint": "首次没有历史记录时使用的平均周期。有 2 次以上记录后会自动计算"
+  },
+  "period_default_length": {
+    "description": "默认经期天数",
+    "type": "int",
+    "default": 5,
+    "hint": "首次没有历史记录时使用的经期天数。有历史记录后会自动计算"
+  },
+  "period_incoming_care_enabled": {
+    "description": "【经期预告】关怀",
+    "type": "bool",
+    "default": true,
+    "hint": "在预测经期来临前主动提醒一次,让你早做准备"
+  },
+  "period_incoming_days_ahead": {
+    "description": "提前几天预告",
+    "type": "int",
+    "default": 2,
+    "hint": "在预测经期开始日期前 N 天开始触发预告"
+  },
+  "period_incoming_cooldown_hours": {
+    "description": "预告冷却（小时）",
+    "type": "int",
+    "default": 24,
+    "hint": "两次预告间隔时间,避免反复推"
+  },
+  "period_incoming_time_start": {
+    "description": "预告 时段起点",
+    "type": "string",
+    "default": "12:00",
+    "hint": "HH:MM 格式。允许推送预告的时段起点,避开早上"
+  },
+  "period_incoming_time_end": {
+    "description": "预告 时段终点",
+    "type": "string",
+    "default": "22:00",
+    "hint": "HH:MM 格式。允许推送预告的时段终点"
+  },
+  "period_care_enabled": {
+    "description": "【经期中】关怀",
+    "type": "bool",
+    "default": true,
+    "hint": "在经期期间隔一段时间主动关心一句(不会每天)"
+  },
+  "period_care_gap_days": {
+    "description": "关心间隔（天）",
+    "type": "int",
+    "default": 2,
+    "hint": "在经期内多少天关心一次。默认 2 天,避免过于频繁"
+  },
+  "period_care_days_range": {
+    "description": "关心的天数范围",
+    "type": "string",
+    "default": "1-5",
+    "hint": "只在经期第 X 到第 Y 天关心。默认 1-5,即经期前 5 天最难受时"
+  },
+  "period_care_cooldown_hours": {
+    "description": "关心冷却（小时）",
+    "type": "int",
+    "default": 36,
+    "hint": "两次关心的最短间隔小时数"
+  },
+  "period_care_time_start": {
+    "description": "关心 时段起点",
+    "type": "string",
+    "default": "13:00",
+    "hint": "HH:MM 格式。避开早起,默认下午 1 点起"
+  },
+  "period_care_time_end": {
+    "description": "关心 时段终点",
+    "type": "string",
+    "default": "22:00",
+    "hint": "HH:MM 格式"
+  },
+  "period_ovulation_care_enabled": {
+    "description": "【排卵期】关怀",
+    "type": "bool",
+    "default": false,
+    "hint": "在排卵日主动提醒一句。默认关闭(用处不大,只在日历上显示颜色标记)"
+  },
+  "period_ovulation_cooldown_hours": {
+    "description": "排卵期关怀 冷却（小时）",
+    "type": "int",
+    "default": 24,
+    "hint": "两次排卵期关怀的最短间隔"
+  },
+  "period_ovulation_time_start": {
+    "description": "排卵期关怀 时段起点",
+    "type": "string",
+    "default": "13:00",
+    "hint": "HH:MM 格式"
+  },
+  "period_ovulation_time_end": {
+    "description": "排卵期关怀 时段终点",
+    "type": "string",
+    "default": "22:00",
+    "hint": "HH:MM 格式"
+  },
+  "fallback_period_incoming": {
+    "description": "【兜底】经期预告",
+    "type": "string",
+    "default": "宝宝, 好像快到日子啦, 包里带片吧~",
+    "hint": "只在 LLM 挂了/超时才会用到"
+  },
+  "fallback_period_care": {
+    "description": "【兜底】经期关怀",
+    "type": "string",
+    "default": "宝宝, 今天肚子还疼不, 想喝点热的吗?",
+    "hint": "只在 LLM 挂了/超时才会用到"
+  },
+  "fallback_period_ovulation": {
+    "description": "【兜底】排卵期",
+    "type": "string",
+    "default": "宝宝, 今天多喝温水, 别太累啦~",
+    "hint": "只在 LLM 挂了/超时才会用到"
+  }
+}

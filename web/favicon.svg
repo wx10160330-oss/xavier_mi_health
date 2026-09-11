@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="softBg" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#fffdf9"/>
+      <stop offset="100%" stop-color="#fceef0"/>
+    </radialGradient>
+    <radialGradient id="softGlow" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#f7e5be" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#f7e5be" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 背景圆形 -->
+  <circle cx="32" cy="32" r="30" fill="url(#softBg)"/>
+  <circle cx="32" cy="32" r="30" fill="none" stroke="#f0dad8" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- 柔和中心光晕 -->
+  <circle cx="32" cy="32" r="16" fill="url(#softGlow)"/>
+
+  <!-- 大四角星 底层柔金 -->
+  <path d="M32 9 L34.3 26.2 L51.5 28.5 L34.3 30.8 L32 48 L29.7 30.8 L12.5 28.5 L29.7 26.2 Z" 
+        fill="#f0d093" opacity="0.95" transform="rotate(0 32 28.5)"/>
+
+  <!-- 更正：四角星居中绘制 cx=32, cy=32, r_long=23, r_short=5.8 -->
+  <g>
+    <!-- 外层浅香槟金主星 -->
+    <path d="M32 9 L33.8 26.2 L51 28 L33.8 29.8 L32 47 L30.2 29.8 L13 28 L30.2 26.2 Z" 
+          fill="#f0d093" opacity="0.95" transform="translate(0, 4)"/>
+    <!-- 内层高光月白金星 -->
+    <path d="M32 14 L33.4 27.5 L47 29 L33.4 30.5 L32 44 L30.6 30.5 L17 29 L30.6 27.5 Z" 
+          fill="#fbecbe" opacity="0.95" transform="translate(0, 3)"/>
+    <!-- 中心最亮星芒 -->
+    <path d="M32 22 L32.8 29.8 L40 31 L32.8 32.2 L32 40 L31.2 32.2 L24 31 L31.2 29.8 Z" 
+          fill="#fff9e8" transform="translate(0, 1)"/>
+  </g>
+
+  <!-- 右上小星芒 -->
+  <path d="M46.7 12.2 L47.4 15.3 L50.5 16 L47.4 16.7 L46.7 19.8 L46 16.7 L42.9 16 L46 15.3 Z" 
+        fill="#f2d8ab" opacity="0.8"/>
+
+  <!-- 左下小星芒 -->
+  <path d="M16.6 44.5 L17.1 47.1 L19.7 47.6 L17.1 48.1 L16.6 50.7 L16.1 48.1 L13.5 47.6 L16.1 47.1 Z" 
+        fill="#f2d8ab" opacity="0.65"/>
+</svg>

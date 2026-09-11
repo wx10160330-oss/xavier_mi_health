@@ -1,0 +1,13 @@
+# 数据目录与敏感凭证（严禁上传）
+data/
+*.token
+*.json
+!_conf_schema.json
+!metadata.yaml
+!requirements.txt
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/

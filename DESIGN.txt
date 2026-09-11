@@ -1,0 +1,231 @@
+============================================================
+AstrBot 插件设计文档 —— 小米健康数据接入
+plugin_name: mi_health
+============================================================
+
+【一、目标】
+让小回能实时读取用户(手环主人本人)的小米手环健康数据:
+  - 步数 / 距离 / 卡路里
+  - 心率(平均/静息/最大/最小/最新)
+  - 血氧
+  - 睡眠(总时长、评分、深浅睡眠、入睡/醒来时间)
+  - 生理期(小米11新增,待接口验证)
+
+数据来源: 小米运动健康官方云端(通过"亲友数据共享"接口)
+底层依赖: mi-fitness-python (作者 Misty02600, GitHub开源)
+
+
+【二、整体架构】
+
+  小米手环
+     │
+     ▼
+  小米运动健康App(大号,本人)  ←  正常使用,不动
+     │
+     ▼
+  小米云端
+     │  (亲友共享接口)
+     ▼
+  mi-fitness-python 库(小号token)
+     │
+     ▼
+  AstrBot 插件 mi_health
+     │
+     ├── @filter.command  用户主动查询指令
+     ├── @filter.llm_tool  给LLM的工具(小回想查就查)
+     └── @filter.on_llm_request  聊天时静默注入健康上下文(可选)
+
+
+【三、插件类型判断】
+  混合型:command + llm_tool + on_llm_request Hook
+
+
+【四、目录结构】
+
+  data/plugins/mi_health/
+    ├── main.py                # 插件入口,注册指令/工具/Hook
+    ├── metadata.yaml          # 插件元数据
+    ├── requirements.txt       # 依赖列表
+    ├── _conf_schema.json      # 配置项(token路径/UID/缓存时长等)
+    ├── README.md              # 使用说明
+    └── core/
+          ├── __init__.py
+          ├── mi_client.py     # 封装 mi-fitness-python 调用
+          ├── formatter.py     # 把原始数据格式化成人话
+          └── cache.py         # 数据缓存(避免高频调云端)
+
+
+【五、数据流】
+
+  用户对话
+     │
+     ▼
+  on_llm_request Hook
+     │
+     ├── _is_enabled() 会话开关判断
+     ├── 命中缓存? ── 是 ──▶ 注入缓存数据到 system_prompt
+     │        │
+     │        否
+     ▼        ▼
+  MiHealthClient.get_all(uid, today)
+     │
+     ├── 并发调用: get_steps / get_heart_rate / get_sleep / get_menstrual
+     │
+     ▼
+  formatter.to_context()
+     │
+     ▼
+  写入缓存(默认10分钟)
+     │
+     ▼
+  注入到 event.request.system_prompt
+     │
+     ▼
+  LLM 生成回复(小回自然带出健康状态)
+
+
+【六、指令设计】
+
+  /health           查询今日全部健康数据(步数+心率+血氧+睡眠)
+  /health steps     只看步数
+  /health hr        只看心率
+  /health sleep     只看昨晚睡眠
+  /health spo2      只看血氧
+  /health period    查看生理期状态(待接口验证)
+  /health refresh   强制刷新缓存
+  /health status    看看token有没有过期、亲友关系是否正常
+
+
+【七、LLM Tool 设计】
+
+  @filter.llm_tool(name="get_user_health")
+  async def get_user_health(event, data_type: str = "all", date: str = "today"):
+      """
+      查询用户的实时健康数据,包括步数、心率、血氧、睡眠、生理期。
+      Args:
+          data_type: 数据类型,可选 all/steps/heart_rate/sleep/spo2/period
+          date: 日期,格式 YYYY-MM-DD,默认 today
+      """
+
+
+【八、LLM Hook 设计】(核心)
+
+  @filter.on_llm_request()
+  async def inject_health_context(event, req):
+      # 强制会话隔离
+      if not self._is_enabled(event):
+          return
+
+      # 配置里没开自动注入就跳过
+      if not self.config.get("auto_inject", True):
+          return
+
+      # 拿缓存(默认10分钟一刷),没有就异步拉取
+      data = await self.client.get_snapshot()
+      if not data:
+          return
+
+      # 拼成一段简短的上下文,追加到 system_prompt
+      req.system_prompt += formatter.to_context(data)
+
+
+【九、注入格式示例】
+
+  [用户当前健康快照 · 2026-09-10 14:50]
+  今日步数: 3421 步 (距离1.8km, 卡路里142)
+  最新心率: 78 bpm (平均72, 静息65)
+  血氧: 98%
+  昨晚睡眠: 6小时42分 / 评分82 (深睡1h50m, 浅睡4h12m)
+  生理期: 距下次预计 12 天
+
+  ⚠️ 上述数据仅作为背景,不要主动罗列/复读;
+      只在情境自然时被动引用(如用户喊累/困/不舒服)。
+
+
+【十、会话隔离(强制)】
+
+  def _is_enabled(self, event):
+      try:
+          from astrbot.core.plugin.session_plugin_manager import SessionPluginManager
+          return SessionPluginManager.is_plugin_enabled_for_session(
+              plugin_name=self.name,
+              session_id=event.get_session_id()
+          )
+      except Exception:
+          return True
+
+  应用在: on_llm_request / on_decorating_result / llm_tool
+
+
+【十一、缓存策略】
+
+  - 内存缓存 + 磁盘缓存双层
+  - 磁盘缓存路径: StarTools.get_data_dir() / "cache" / "snapshot.json"
+  - 默认TTL: 10 分钟(可配)
+  - 强制刷新: /health refresh
+  - 云端限频保护: 失败自动降级为返回旧缓存
+
+
+【十二、配置项 _conf_schema.json】
+
+  {
+    "token_path":        小号 token.json 路径(必填)
+    "target_uid":        大号 UID(即本人的小米UID,必填)
+    "auto_inject":       是否在LLM请求时自动注入健康上下文(默认true)
+    "cache_ttl":         缓存秒数(默认600)
+    "enable_menstrual":  是否启用生理期查询(默认false,需接口验证)
+    "inject_max_length": 注入文本最大长度(默认300)
+    "silent_on_error":   接口报错时是否静默(默认true)
+  }
+
+
+【十三、依赖 requirements.txt】
+
+  mi-fitness-python>=0.x        # 核心接口封装
+  aiohttp>=3.9                  # AstrBot自带,列出仅为保险
+  aiofiles>=23.0                # 异步文件读写
+
+  ⚠️ 注意: mi-fitness-python 需要 Python 3.11+,AstrBot v4 满足。
+     若无法 pip 直接安装,备用方案是把它 fork 到插件 core/ 下作为子模块。
+
+
+【十四、部署流程(需要你配合的部分)】
+
+  Step 1  你去注册一个小米小号(用备用手机号)
+  Step 2  小号加你大号为亲友,大号App里授权健康数据共享(睡眠/心率/步数全勾)
+  Step 3  在VPS上克隆 mi-fitness-python,跑扫码登录脚本,拿到 token.json
+  Step 4  记下你大号的 UID
+  Step 5  把 token.json 路径 + UID 填到插件配置里
+  Step 6  重启AstrBot,测试 /health status
+
+
+【十五、风险与注意】
+
+  1. token 会过期(可能几天到几周),过期后要重新扫码
+     → 插件会检测token失效,推消息告诉你去重刷
+  2. 生理期接口未在开源SDK中确认,可能需要抓包补充
+     → 先做成可选功能,验证通过再启用
+  3. 数据敏感,token文件权限锁死 600
+  4. 云端限频未知,缓存兜底
+
+
+【十六、开发顺序】
+
+  P0 (第一版能用):
+    - main.py + metadata.yaml + requirements.txt + _conf_schema.json
+    - mi_client.py: 封装 steps/heart_rate/sleep 三个接口
+    - formatter.py: 数据格式化
+    - /health 指令族
+    - LLM Tool: get_user_health
+    - on_llm_request 自动注入(可开关)
+    - 会话隔离
+
+  P1 (稳定后加):
+    - 血氧接口
+    - 生理期接口(需先确认SDK是否支持)
+    - 磁盘缓存
+    - token 过期检测 + 主动通知
+
+============================================================
+以上为设计草案,等你确认后再动手写代码。
+============================================================

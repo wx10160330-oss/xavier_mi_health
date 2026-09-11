@@ -1,0 +1,10 @@
+name: mi_health
+display_name: Star Whisper Health (星语健康)
+desc: 星语健康 · 小回的健康守护。通过小米运动健康云端亲友共享接口, 实时读取步数、心率、血氧、睡眠、活力数据, 包含生理期智能日历、历史趋势看板, 支持聊天上下文自动注入 + 后台异常主动关怀。
+short_desc: 星语健康 · 小回的健康守护看板与关怀
+version: 0.3.0
+author: xavier
+repo: "https://github.com/wx10160330-oss/xavier_mi_health"
+support_platforms:
+  - all
+astrbot_version: ">=4.0.0"

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>历史趋势 · Star Whisper Health</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📊 历史趋势</h1>
+      <div class="nav-links">
+        <a href="/" class="nav-btn">概览</a>
+        <a href="/calendar" class="nav-btn">日历</a>
+        <a href="/history" class="nav-btn active">历史</a>
+      </div>
+    </div>
+
+    <!-- 范围切换 -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button id="btn-7d" class="btn btn-primary" style="padding:8px;">近 7 天</button>
+      <button id="btn-30d" class="btn btn-outline" style="padding:8px;">近 30 天</button>
+    </div>
+
+    <!-- 心率图表 -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:10px;">❤️ 心率趋势 (bpm)</div>
+      <div style="position:relative;height:200px;width:100%;">
+        <canvas id="chart-hr"></canvas>
+      </div>
+    </div>
+
+    <!-- 血氧图表 -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:10px;">🫁 血氧趋势 (%)</div>
+      <div style="position:relative;height:200px;width:100%;">
+        <canvas id="chart-spo2"></canvas>
+      </div>
+    </div>
+
+    <!-- 步数图表 -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:10px;">👣 步数</div>
+      <div style="position:relative;height:200px;width:100%;">
+        <canvas id="chart-steps"></canvas>
+      </div>
+    </div>
+
+    <!-- 睡眠评分图表 -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:10px;">😴 睡眠评分</div>
+      <div style="position:relative;height:200px;width:100%;">
+        <canvas id="chart-sleep"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentDays = 7;
+    let charts = {};
+
+    async function loadHistory(days) {
+      currentDays = days;
+      try {
+        const res = await fetch(`/api/history?days=${days}`);
+        const json = await res.json();
+        if (!json.ok) return;
+
+        const data = json.data || [];
+        renderCharts(data);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderCharts(data) {
+      const labels = data.map(d => d.date.slice(5)); // MM-DD
+      
+      // 取第一条数据（后端返回的是数组/对象）
+      const first = (v) => Array.isArray(v) ? (v[0] || null) : v;
+      
+      const hrData = data.map(d => {
+        const hr = first(d.snapshot.heart_rate);
+        return (hr && (hr.latest_hr && hr.latest_hr.bpm || hr.avg_hr)) || null;
+      });
+      
+      const spo2Data = data.map(d => {
+        const spo2 = first(d.snapshot.spo2);
+        return (spo2 && spo2.spo2) || null;
+      });
+      
+      const stepData = data.map(d => {
+        const steps = first(d.snapshot.steps);
+        return (steps && steps.steps) || 0;
+      });
+      
+      const sleepData = data.map(d => {
+        const sleep = first(d.snapshot.sleep);
+        return (sleep && (sleep.sleep_score || sleep.score)) || null;
+      });
+
+      createOrUpdate('chart-hr', labels, [{
+        label: '心率',
+        data: hrData,
+        borderColor: '#f26b88',
+        backgroundColor: 'rgba(242, 107, 136, 0.1)',
+        tension: 0.3,
+        fill: true,
+      }]);
+
+      createOrUpdate('chart-spo2', labels, [{
+        label: '血氧',
+        data: spo2Data,
+        borderColor: '#5c6bc0',
+        backgroundColor: 'rgba(92, 107, 192, 0.1)',
+        tension: 0.3,
+        fill: true,
+      }]);
+
+      createOrUpdate('chart-steps', labels, [{
+        label: '步数',
+        data: stepData,
+        backgroundColor: '#42a5f5',
+        type: 'bar',
+      }], 'bar');
+
+      createOrUpdate('chart-sleep', labels, [{
+        label: '睡眠分',
+        data: sleepData,
+        borderColor: '#ab47bc',
+        backgroundColor: 'rgba(171, 71, 188, 0.1)',
+        tension: 0.3,
+        fill: true,
+      }]);
+    }
+
+    function createOrUpdate(canvasId, labels, datasets, type = 'line') {
+      const ctx = document.getElementById(canvasId);
+      // 销毁旧图表（释放内存+清空canvas）
+      if (charts[canvasId]) {
+        charts[canvasId].destroy();
+        delete charts[canvasId];
+      }
+      // 强制清空 canvas（避免 Chart.js 有时不完全清理）
+      ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+      
+      charts[canvasId] = new Chart(ctx, {
+        type: type,
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: false }
+          }
+        }
+      });
+    }
+
+    document.getElementById('btn-7d').addEventListener('click', () => {
+      document.getElementById('btn-7d').className = 'btn btn-primary';
+      document.getElementById('btn-30d').className = 'btn btn-outline';
+      loadHistory(7);
+    });
+
+    document.getElementById('btn-30d').addEventListener('click', () => {
+      document.getElementById('btn-30d').className = 'btn btn-primary';
+      document.getElementById('btn-7d').className = 'btn btn-outline';
+      loadHistory(30);
+    });
+
+    loadHistory(7);
+  </script>
+</body>
+</html>

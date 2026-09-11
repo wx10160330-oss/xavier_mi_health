@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>女性健康 · 生理期日历 · Star Whisper</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 顶部 -->
+    <div class="header">
+      <h1>🌙 女性健康日历</h1>
+      <div class="nav-links">
+        <a href="/" class="nav-btn">概览</a>
+        <a href="/calendar" class="nav-btn active">日历</a>
+        <a href="/history" class="nav-btn">历史</a>
+      </div>
+    </div>
+
+    <!-- 今日状态条 -->
+    <div class="status-banner">
+      <div>
+        <div class="status-title">今日状态</div>
+        <div id="banner-main" class="status-main">加载中...</div>
+        <div id="banner-sub" class="status-sub"></div>
+      </div>
+      <div id="banner-days" style="font-size:32px;font-weight:700;"></div>
+    </div>
+
+    <!-- 图例 (参考你发的设计) -->
+    <div class="card" style="padding:10px 14px;margin-bottom:12px;">
+      <div class="legend">
+        <div class="legend-item"><span class="dot dot-period"></span>经期</div>
+        <div class="legend-item"><span class="dot dot-predicted"></span>预测经期</div>
+        <div class="legend-item"><span class="dot dot-ovulation-day"></span>排卵日</div>
+        <div class="legend-item"><span class="dot dot-ovulation"></span>排卵期</div>
+      </div>
+    </div>
+
+    <!-- 日历卡片 -->
+    <div class="card">
+      <div class="month-picker">
+        <button id="btn-prev-month">‹</button>
+        <span id="current-month-label">2026年9月</span>
+        <button id="btn-next-month">›</button>
+      </div>
+
+      <div class="calendar-grid">
+        <div class="cal-head">一</div>
+        <div class="cal-head">二</div>
+        <div class="cal-head">三</div>
+        <div class="cal-head">四</div>
+        <div class="cal-head">五</div>
+        <div class="cal-head">六</div>
+        <div class="cal-head">日</div>
+      </div>
+      <div id="calendar-days" class="calendar-grid" style="margin-top:4px;"></div>
+    </div>
+
+    <!-- 底部操作与统计 -->
+    <div class="card">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text-sub);">记录经期</div>
+      <div class="action-bar" style="margin-top:0;">
+        <button id="btn-mark-start" class="btn btn-primary">标记今天来了</button>
+        <button id="btn-mark-end" class="btn btn-outline">标记今天结束</button>
+      </div>
+    </div>
+
+    <!-- 统计信息 -->
+    <div class="card">
+      <div class="stats-row">
+        <div class="stat-item" id="stat-cycle-item" style="cursor:pointer;" title="点击修改">
+          <h3 id="stat-cycle">28天</h3>
+          <p>平均周期 ✎</p>
+        </div>
+        <div class="stat-item" id="stat-length-item" style="cursor:pointer;" title="点击修改">
+          <h3 id="stat-length">5天</h3>
+          <p>平均经期 ✎</p>
+        </div>
+        <div class="stat-item">
+          <h3 id="stat-count">0次</h3>
+          <p>已记录</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 点击日期弹窗 -->
+  <div id="modal-day" class="modal-mask">
+    <div class="modal">
+      <h3 id="modal-title">2026-09-10</h3>
+      <p id="modal-desc" style="font-size:13px;color:var(--text-sub);margin-bottom:12px;">状态: 无记录</p>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px;color:var(--text-sub);">备注（可选，如：痛经/偏头痛/轻微）</label>
+        <input id="modal-note" type="text" placeholder="输入备注..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-top:4px;box-sizing:border-box;">
+      </div>
+
+      <div class="modal-actions">
+        <button id="btn-modal-mark" class="primary">设为这天开始</button>
+        <button id="btn-modal-end">设为这天结束</button>
+        <button id="btn-modal-save-note">保存备注</button>
+        <button id="btn-modal-delete" class="danger" style="display:none;">删除此记录</button>
+        <button id="btn-modal-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentYear = new Date().getFullYear();
+    let currentMonth = new Date().getMonth() + 1; // 1-12
+    let calendarMarks = {};
+    let allPeriods = [];
+    let selectedDate = null;
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    async function loadPeriodData() {
+      try {
+        const res = await fetch('/api/period');
+        const json = await res.json();
+        if (!json.ok) return;
+
+        const p = json.status || {};
+        allPeriods = (json.data && json.data.periods) || [];
+        const settings = (json.data && json.data.settings) || {};
+
+        // 统计
+        document.getElementById('stat-cycle').textContent = (settings.avg_cycle_days || 28) + '天';
+        document.getElementById('stat-length').textContent = (settings.avg_period_days || 5) + '天';
+        document.getElementById('stat-count').textContent = allPeriods.length + '次';
+
+        // 横幅
+        const bMain = document.getElementById('banner-main');
+        const bSub = document.getElementById('banner-sub');
+        const bDays = document.getElementById('banner-days');
+
+        if (p.in_period) {
+          bMain.textContent = '月经期第 ' + p.period_day + ' 天';
+          bSub.textContent = '注意休息，多喝温水~';
+          bDays.textContent = 'Day ' + p.period_day;
+        } else if (p.days_to_next !== null && p.days_to_next !== undefined) {
+          if (p.days_to_next <= 0) {
+            bMain.textContent = '预计今天开始';
+            bSub.textContent = '提前准备好卫生巾哦';
+            bDays.textContent = '!';
+          } else {
+            bMain.textContent = '距下次经期还有';
+            bSub.textContent = '预计 ' + p.next_period + ' 开始';
+            bDays.textContent = p.days_to_next + '天';
+          }
+        } else if (p.in_ovulation) {
+          bMain.textContent = p.in_ovulation_day ? '今日 · 排卵日' : '今日 · 排卵期';
+          bSub.textContent = '排卵期内注意身体';
+          bDays.textContent = '✨';
+        } else {
+          bMain.textContent = '记录不足以预测';
+          bSub.textContent = '点击下方按钮记录一次吧';
+          bDays.textContent = '--';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function renderCalendar(year, month) {
+      document.getElementById('current-month-label').textContent = `${year}年${month}月`;
+
+      try {
+        const res = await fetch(`/api/period/calendar?year=${year}&month=${month}`);
+        const json = await res.json();
+        calendarMarks = json.marks || {};
+      } catch (e) {
+        calendarMarks = {};
+      }
+
+      const grid = document.getElementById('calendar-days');
+      grid.innerHTML = '';
+
+      // 该月第 1 天是星期几 (0=周日, 1=周一... 转换为 1=周一 ... 7=周日)
+      const firstDay = new Date(year, month - 1, 1).getDay();
+      const emptyCount = (firstDay === 0 ? 7 : firstDay) - 1; // 前置空白格
+
+      for (let i = 0; i < emptyCount; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cal-day empty';
+        grid.appendChild(cell);
+      }
+
+      // 当月天数
+      const daysInMonth = new Date(year, month, 0).getDate();
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const cell = document.createElement('div');
+        cell.className = 'cal-day';
+        cell.textContent = d;
+
+        if (dateStr === todayStr) {
+          cell.classList.add('today');
+        }
+
+        // 标记样式
+        const mark = calendarMarks[dateStr];
+        if (mark === 'period') {
+          cell.classList.add('mark-period');
+        } else if (mark === 'period_predicted') {
+          cell.classList.add('mark-predicted');
+        } else if (mark === 'ovulation_day') {
+          cell.classList.add('mark-ovulation-day');
+        } else if (mark === 'ovulation') {
+          cell.classList.add('mark-ovulation');
+        }
+
+        cell.addEventListener('click', () => openDayModal(dateStr, mark));
+        grid.appendChild(cell);
+      }
+    }
+
+    function openDayModal(dateStr, mark) {
+      selectedDate = dateStr;
+      document.getElementById('modal-title').textContent = dateStr;
+      
+      let desc = '状态: 无记录';
+      if (mark === 'period') desc = '状态: 经期中';
+      else if (mark === 'period_predicted') desc = '状态: 预测经期';
+      else if (mark === 'ovulation_day') desc = '状态: 预测排卵日';
+      else if (mark === 'ovulation') desc = '状态: 预测排卵期';
+      document.getElementById('modal-desc').textContent = desc;
+
+      // 检查是否是某个周期的 start
+      const matched = allPeriods.find(p => p.start === dateStr);
+      const btnDel = document.getElementById('btn-modal-delete');
+      if (matched) {
+        btnDel.style.display = 'block';
+      } else {
+        btnDel.style.display = 'none';
+      }
+
+      // 读取备注
+      let note = '';
+      for (const p of allPeriods) {
+        if (p.notes && p.notes[dateStr]) {
+          note = p.notes[dateStr];
+          break;
+        }
+      }
+      document.getElementById('modal-note').value = note;
+
+      document.getElementById('modal-day').classList.add('show');
+    }
+
+    function closeDayModal() {
+      document.getElementById('modal-day').classList.remove('show');
+      selectedDate = null;
+    }
+
+    // 事件绑定
+    document.getElementById('btn-prev-month').addEventListener('click', () => {
+      currentMonth--;
+      if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+      renderCalendar(currentYear, currentMonth);
+    });
+
+    // 点击"平均周期"卡片 → 弹窗修改
+    document.getElementById('stat-cycle-item').addEventListener('click', async () => {
+      const curText = document.getElementById('stat-cycle').textContent.replace('天', '').trim();
+      const input = prompt('请输入平均周期天数（14~60）：', curText);
+      if (input === null) return;
+      const val = parseInt(input, 10);
+      if (isNaN(val) || val < 14 || val > 60) {
+        alert('请输入 14~60 之间的整数');
+        return;
+      }
+      try {
+        const res = await fetch('/api/period/settings', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({avg_cycle_days: val})
+        });
+        const j = await res.json();
+        if (j.ok) {
+          await loadPeriodData();
+          await renderCalendar(currentYear, currentMonth);
+        } else {
+          alert('修改失败: ' + (j.msg || '未知错误'));
+        }
+      } catch (e) {
+        alert('网络错误: ' + e.message);
+      }
+    });
+
+    // 点击"平均经期"卡片 → 弹窗修改
+    document.getElementById('stat-length-item').addEventListener('click', async () => {
+      const curText = document.getElementById('stat-length').textContent.replace('天', '').trim();
+      const input = prompt('请输入平均经期天数（1~14）：', curText);
+      if (input === null) return;
+      const val = parseInt(input, 10);
+      if (isNaN(val) || val < 1 || val > 14) {
+        alert('请输入 1~14 之间的整数');
+        return;
+      }
+      try {
+        const res = await fetch('/api/period/settings', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({avg_period_days: val})
+        });
+        const j = await res.json();
+        if (j.ok) {
+          await loadPeriodData();
+          await renderCalendar(currentYear, currentMonth);
+        } else {
+          alert('修改失败: ' + (j.msg || '未知错误'));
+        }
+      } catch (e) {
+        alert('网络错误: ' + e.message);
+      }
+    });
+
+    document.getElementById('btn-next-month').addEventListener('click', () => {
+      currentMonth++;
+      if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+      renderCalendar(currentYear, currentMonth);
+    });
+
+    document.getElementById('btn-mark-start').addEventListener('click', async () => {
+      if (!confirm(`确定标记今天 (${todayStr}) 开始吗？`)) return;
+      const res = await fetch('/api/period/mark', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({date: todayStr})
+      });
+      const j = await res.json();
+      if (j.ok) {
+        await loadPeriodData();
+        await renderCalendar(currentYear, currentMonth);
+        alert('已记录经期开始！');
+      }
+    });
+
+    document.getElementById('btn-mark-end').addEventListener('click', async () => {
+      if (!confirm(`确定标记今天 (${todayStr}) 结束吗？`)) return;
+      const res = await fetch('/api/period/end', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({date: todayStr})
+      });
+      const j = await res.json();
+      if (j.ok) {
+        await loadPeriodData();
+        await renderCalendar(currentYear, currentMonth);
+        alert('已记录经期结束！');
+      } else {
+        alert(j.msg || '标记失败');
+      }
+    });
+
+    document.getElementById('btn-modal-mark').addEventListener('click', async () => {
+      if (!selectedDate) return;
+      await fetch('/api/period/mark', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({date: selectedDate})
+      });
+      closeDayModal();
+      await loadPeriodData();
+      await renderCalendar(currentYear, currentMonth);
+    });
+
+    document.getElementById('btn-modal-end').addEventListener('click', async () => {
+      if (!selectedDate) return;
+      const res = await fetch('/api/period/end', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({date: selectedDate})
+      });
+      const j = await res.json();
+      if (!j.ok) alert(j.msg);
+      closeDayModal();
+      await loadPeriodData();
+      await renderCalendar(currentYear, currentMonth);
+    });
+
+    document.getElementById('btn-modal-save-note').addEventListener('click', async () => {
+      if (!selectedDate) return;
+      const note = document.getElementById('modal-note').value;
+      const res = await fetch('/api/period/note', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({date: selectedDate, note: note})
+      });
+      const j = await res.json();
+      if (!j.ok) alert(j.msg);
+      else alert('备注已保存');
+      closeDayModal();
+    });
+
+    document.getElementById('btn-modal-delete').addEventListener('click', async () => {
+      if (!selectedDate) return;
+      if (!confirm(`确定删除 ${selectedDate} 开始的整段周期记录吗？`)) return;
+      await fetch('/api/period/delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({start: selectedDate})
+      });
+      closeDayModal();
+      await loadPeriodData();
+      await renderCalendar(currentYear, currentMonth);
+    });
+
+    document.getElementById('btn-modal-close').addEventListener('click', closeDayModal);
+
+    // 初始化
+    (async () => {
+      await loadPeriodData();
+      await renderCalendar(currentYear, currentMonth);
+    })();
+  </script>
+</body>
+</html>
