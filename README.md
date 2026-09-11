@@ -222,7 +222,7 @@ AstrBot 管理面板 → 插件 → mi_health → 配置:
 ## 常见问题
 
 **Q: token 过期了怎么办?**
-A: **最省事的办法**: 进到 `data/plugins/mi_health/tools/` 目录, 双击 `刷新token.bat`, 用小号手机微信扫二维码, 新 token 会自动覆盖到配置的路径。然后去 AstrBot 面板点插件「重新加载」即可。详见 [tools/README.md](./tools/README.md)。
+A: **最省事的办法**: 进到 `data/plugins/mi_health/tools/` 目录, 双击 `刷新token.bat`, 用小号手机微信扫二维码, 新 token 会自动覆盖到配置的路径。然后去 AstrBot 面板点插件「重新加载」即可。
 
 **Q: 数据延迟多少?**
 A: 手环 → 小米云端本身有几秒~几分钟延迟,插件再加 10 分钟缓存。想更新鲜就调小 `cache_ttl` 或用 `/health refresh`。
@@ -319,8 +319,6 @@ token 过期是最常见的问题（小米云端有效期不固定, 可能几个
 - 对话里发 `/health status`, 显示过期
 - `/health` 系列指令报 401 / 未授权
 - 插件日志里出现 `AuthError` 或 `token expired`
-
-更多说明见 [tools/README.md](./tools/README.md)。
 
 ---
 
