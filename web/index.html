@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>健康概览 · Star Whisper Health</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 顶部 -->
+    <div class="header">
+      <h1>✨ 今日星语健康</h1>
+      <div class="nav-links">
+        <a href="/" class="nav-btn active">概览</a>
+        <a href="/calendar" class="nav-btn">日历</a>
+        <a href="/history" class="nav-btn">历史</a>
+      </div>
+    </div>
+
+    <!-- 生理期状态提示条 (若有) -->
+    <div id="period-banner" class="status-banner" style="display:none;">
+      <div>
+        <div class="status-title">女性健康</div>
+        <div id="period-status-text" class="status-main">加载中...</div>
+        <div id="period-sub-text" class="status-sub"></div>
+      </div>
+      <a href="/calendar" style="color:#880e4f;font-size:22px;text-decoration:none;">›</a>
+    </div>
+
+    <!-- 刷新按钮 & 抓取时间 -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:0 4px;gap:8px;flex-wrap:wrap;">
+      <span id="last-sync" style="font-size:11px;color:#888;flex:1;min-width:0;">正在加载...</span>
+      <div style="display:flex;gap:6px;">
+        <button id="btn-open-mihealth" class="btn-outline" style="padding:6px 12px;font-size:12px;border-radius:14px;cursor:pointer;" title="唤起小米运动健康 App 同步手环">📱 打开小米运动</button>
+        <button id="btn-refresh" class="btn-outline" style="padding:6px 14px;font-size:12px;border-radius:14px;cursor:pointer;">🔄 刷新数据</button>
+      </div>
+    </div>
+
+    <!-- 健康数据卡片 -->
+    <div class="health-cards">
+      <div class="h-card">
+        <div class="h-icon">❤️</div>
+        <div class="h-label">心率</div>
+        <div id="val-hr" class="h-value">--<span class="h-unit">bpm</span></div>
+        <div id="sub-hr" class="h-time">--</div>
+      </div>
+
+      <div class="h-card">
+        <div class="h-icon">🫁</div>
+        <div class="h-label">血氧</div>
+        <div id="val-spo2" class="h-value">--<span class="h-unit">%</span></div>
+        <div id="sub-spo2" class="h-time">--</div>
+      </div>
+
+      <div class="h-card">
+        <div class="h-icon">👣</div>
+        <div class="h-label">今日步数</div>
+        <div id="val-steps" class="h-value">--<span class="h-unit">步</span></div>
+        <div id="sub-steps" class="h-time">--</div>
+      </div>
+
+      <div class="h-card">
+        <div class="h-icon">😴</div>
+        <div class="h-label">昨晚睡眠</div>
+        <div id="val-sleep" class="h-value">--<span class="h-unit">分</span></div>
+        <div id="sub-sleep" class="h-time">--</div>
+      </div>
+
+      <div id="card-vitality" class="h-card full-width" style="display:none;">
+        <div class="h-icon">🌟</div>
+        <div class="h-label">活力指标 (中高强度)</div>
+        <div id="val-vitality" class="h-value">--<span class="h-unit">分</span></div>
+        <div id="sub-vitality" class="h-time">--</div>
+      </div>
+    </div>
+
+    <!-- 底部快捷入口 -->
+    <div class="action-bar">
+      <a href="/calendar" class="btn btn-primary" style="text-decoration:none;">📅 生理期日历</a>
+      <a href="/history" class="btn btn-outline" style="text-decoration:none;">📊 历史趋势</a>
+    </div>
+  </div>
+
+  <script>
+    async function loadData(force = false) {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const k = params.get('k');
+        let url = force ? '/api/today?force=1' : '/api/today';
+        if (k) {
+          url += (url.includes('?') ? '&' : '?') + 'k=' + encodeURIComponent(k);
+        }
+        // 加上时间戳防止手机浏览器强行走本地 304 缓存
+        url += (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+        const res = await fetch(url);
+        const raw = await res.text();
+        let json;
+        try {
+          json = JSON.parse(raw);
+        } catch (parseErr) {
+          throw new Error('服务器返回非 JSON (状态 ' + res.status + '): ' + raw.slice(0, 100));
+        }
+        if (!json.ok) {
+          document.getElementById('last-sync').textContent = '加载失败: ' + (json.msg || '未知错误');
+          return;
+        }
+
+        const s = json.snapshot || {};
+        const p = json.period_status || {};
+        const time = json.updated_at || '';
+
+        document.getElementById('last-sync').textContent = '数据更新于 ' + time;
+
+        // 工具: 时间戳 -> HH:MM（小米返回的是 UTC 时间戳，但表示的是本地日期，直接读 UTC 分量）
+        const fmtTime = (ts) => {
+          if (!ts) return '';
+          const d = new Date(ts * 1000);
+          const h = String(d.getUTCHours()).padStart(2, '0');
+          const m = String(d.getUTCMinutes()).padStart(2, '0');
+          return h + ':' + m;
+        };
+        // 工具: 从 list/dict 里取第一条
+        const first = (v) => Array.isArray(v) ? (v[0] || null) : v;
+
+        // 心率
+        const hr = first(s.heart_rate);
+        if (hr) {
+          const latest = (hr.latest_hr && hr.latest_hr.bpm) || hr.avg_hr;
+          if (latest) {
+            document.getElementById('val-hr').innerHTML = latest + '<span class="h-unit">bpm</span>';
+            const lt = (hr.latest_hr && hr.latest_hr.time) ? fmtTime(hr.latest_hr.time) : '';
+            document.getElementById('sub-hr').textContent =
+              lt + ' (静息 ' + (hr.avg_rhr || '-') + ' · 范围 ' + (hr.min_hr || '-') + '~' + (hr.max_hr || '-') + ')';
+          }
+        }
+
+        // 血氧
+        const spo2 = first(s.spo2);
+        if (spo2 && spo2.spo2) {
+          document.getElementById('val-spo2').innerHTML = spo2.spo2 + '<span class="h-unit">%</span>';
+          document.getElementById('sub-spo2').textContent = fmtTime(spo2.time);
+        }
+
+        // 步数
+        const steps = first(s.steps);
+        if (steps) {
+          document.getElementById('val-steps').innerHTML = (steps.steps || 0) + '<span class="h-unit">步</span>';
+          const distKm = steps.distance ? (steps.distance / 1000).toFixed(2) + 'km' : '';
+          document.getElementById('sub-steps').textContent =
+            (steps.calories || 0) + ' kcal' + (distKm ? ' · ' + distKm : '');
+        }
+
+        // 睡眠（sleep 可能返回多条，取最新一条 = time 最大）
+        let sleep = s.sleep;
+        if (Array.isArray(sleep)) {
+          sleep = sleep.filter(x => x).sort((a, b) => (b.time || 0) - (a.time || 0))[0] || null;
+        }
+        if (sleep) {
+          const score = sleep.sleep_score || sleep.score;
+          const dur = sleep.total_duration || sleep.duration || 0;
+          if (score || dur) {
+            document.getElementById('val-sleep').innerHTML =
+              (score || Math.round(dur / 60 * 10) / 10) + '<span class="h-unit">' + (score ? '分' : '小时') + '</span>';
+            const durH = (dur / 60).toFixed(1);
+            const deep = sleep.sleep_deep_duration || sleep.deep_sleep_duration || 0;
+            document.getElementById('sub-sleep').textContent = durH + ' 小时 · 深睡 ' + deep + '分';
+          }
+        }
+
+        // 活力
+        const vit = first(s.vitality);
+        if (vit && (vit.duration || vit.minutes)) {
+          document.getElementById('card-vitality').style.display = 'block';
+          const mins = vit.duration || vit.minutes;
+          document.getElementById('val-vitality').innerHTML = mins + '<span class="h-unit">分钟</span>';
+          document.getElementById('sub-vitality').textContent = '今日中高强度活动';
+        }
+
+        // 生理期横幅
+        const banner = document.getElementById('period-banner');
+        if (p.in_period) {
+          banner.style.display = 'flex';
+          document.getElementById('period-status-text').textContent = '今日 · 月经期第 ' + p.period_day + ' 天';
+          document.getElementById('period-sub-text').textContent = '平均经期 ' + p.avg_period_days + ' 天';
+        } else if (p.days_to_next !== null && p.days_to_next !== undefined) {
+          banner.style.display = 'flex';
+          if (p.days_to_next <= 0) {
+            document.getElementById('period-status-text').textContent = '预计今天开始';
+          } else {
+            document.getElementById('period-status-text').textContent = '距下次经期 ' + p.days_to_next + ' 天';
+          }
+          document.getElementById('period-sub-text').textContent = '预计 ' + (p.next_period || '');
+        } else if (p.in_ovulation) {
+          banner.style.display = 'flex';
+          document.getElementById('period-status-text').textContent = p.in_ovulation_day ? '今日 · 排卵日' : '今日 · 排卵期';
+          document.getElementById('period-sub-text').textContent = '注意身体变化';
+        }
+      } catch (e) {
+        console.error(e);
+        document.getElementById('last-sync').textContent = '加载失败: ' + e.message;
+      }
+    }
+
+    // 📱 打开小米运动健康 App (仅移动端有效)
+    document.getElementById('btn-open-mihealth').addEventListener('click', () => {
+      const ua = navigator.userAgent || '';
+      const isMobile = /Android|iPhone|iPad|iPod|HarmonyOS/i.test(ua);
+      if (!isMobile) {
+        alert('这个按钮只能在手机上唤起小米运动健康哦~');
+        return;
+      }
+      // 优先 Android intent, 再退化到通用 scheme, 都失败再引导到应用商店
+      const isAndroid = /Android|HarmonyOS/i.test(ua);
+      let fallbackTimer = null;
+      const goStore = () => {
+        // 如果 3 秒还在页面里, 说明没拉起来
+        if (isAndroid) {
+          window.location.href = 'https://app.mi.com/details?id=com.mi.health';
+        } else {
+          window.location.href = 'https://apps.apple.com/cn/app/id1502896831';
+        }
+      };
+      // 页面被切走时清掉兜底定时器 (说明成功拉起了)
+      const onHide = () => {
+        if (document.hidden && fallbackTimer) {
+          clearTimeout(fallbackTimer);
+          fallbackTimer = null;
+        }
+      };
+      document.addEventListener('visibilitychange', onHide, { once: true });
+
+      try {
+        if (isAndroid) {
+          // Xiaomi Wear / 小米运动健康 的通用 intent
+          window.location.href = 'intent://open#Intent;scheme=mihealth;package=com.mi.health;end';
+        } else {
+          window.location.href = 'mihealth://';
+        }
+        fallbackTimer = setTimeout(goStore, 2500);
+      } catch (e) {
+        goStore();
+      }
+    });
+
+    document.getElementById('btn-refresh').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-refresh');
+      btn.textContent = '⏳ 正在拉取...';
+      btn.disabled = true;
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const k = params.get('k');
+        let url = '/api/refresh';
+        if (k) {
+          url += '?k=' + encodeURIComponent(k);
+        }
+        url += (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+        const res = await fetch(url);
+        const json = await res.json();
+        if (json.ok) {
+          await loadData(true);
+        } else {
+          alert('刷新失败: ' + (json.msg || '未知错误'));
+        }
+      } catch (e) {
+        alert('网络错误: ' + e.message);
+      } finally {
+        btn.textContent = '🔄 刷新数据';
+        btn.disabled = false;
+      }
+    });
+
+    // 首次加载（直接强制拉一次最新）
+    loadData(true);
+
+    // 定时轮询（每30秒从云端拉一次最新数据）
+    setInterval(() => {
+      loadData(true);
+    }, 30000);
+
+    // 页面从后台切换回前台时，自动重新同步
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        loadData(true);
+      }
+    });
+    window.addEventListener('pageshow', () => {
+      loadData(true);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,409 @@
+/* mi_health 全局样式 (粉紫色系，参考小米健康 App 女性健康排版) */
+:root {
+  --primary: #f26b88;
+  --primary-light: #fde8ed;
+  --primary-dark: #d64d6d;
+  --predicted: #f8a5b8;
+  --ovulation: #a0d8ef;
+  --ovulation-day: #b19ffb;
+  --bg: #faf7f8;
+  --card-bg: #ffffff;
+  --text-main: #333333;
+  --text-sub: #888888;
+  --border: #f0e6e8;
+  --radius: 16px;
+  --shadow: 0 4px 20px rgba(242, 107, 136, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background-color: var(--bg);
+  color: var(--text-main);
+  line-height: 1.5;
+  padding-bottom: 40px;
+}
+
+.container {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* 顶部导航 */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  margin-bottom: 12px;
+}
+
+.header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.nav-links {
+  display: flex;
+  gap: 8px;
+}
+
+.nav-btn {
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-sub);
+  text-decoration: none;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-btn.active, .nav-btn:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* 卡片 */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+
+/* 今日状态横幅 */
+.status-banner {
+  background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  color: #880e4f;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.status-title {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.status-main {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.status-sub {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+/* 图例 */
+.legend {
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 4px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text-sub);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-period {
+  background: var(--primary);
+}
+
+.dot-predicted {
+  background: repeating-linear-gradient(45deg, var(--predicted), var(--predicted) 2px, #fff 2px, #fff 4px);
+  border: 1px solid var(--predicted);
+}
+
+.dot-ovulation-day {
+  background: var(--ovulation-day);
+}
+
+.dot-ovulation {
+  background: var(--ovulation);
+}
+
+/* 月份切换器 */
+.month-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.month-picker button {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--text-main);
+  padding: 4px 12px;
+}
+
+/* 日历网格 */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  text-align: center;
+}
+
+.cal-head {
+  font-size: 12px;
+  color: var(--text-sub);
+  padding: 6px 0;
+  font-weight: 500;
+}
+
+.cal-day {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 14px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cal-day:hover {
+  background: #fdf0f3;
+}
+
+.cal-day.empty {
+  cursor: default;
+  background: none;
+}
+
+.cal-day.today {
+  border: 2px solid var(--primary);
+  font-weight: 700;
+}
+
+.cal-day-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-top: 2px;
+}
+
+/* 标记样式 */
+.cal-day.mark-period {
+  background: var(--primary);
+  color: #fff;
+}
+.cal-day.mark-period .cal-day-dot { background: #fff; }
+
+.cal-day.mark-predicted {
+  background: repeating-linear-gradient(45deg, #fde8ed, #fde8ed 4px, #fff 4px, #fff 8px);
+  border: 1px dashed var(--predicted);
+  color: var(--primary-dark);
+}
+
+.cal-day.mark-ovulation-day {
+  background: var(--ovulation-day);
+  color: #fff;
+}
+
+.cal-day.mark-ovulation {
+  background: var(--ovulation);
+  color: #0d47a1;
+}
+
+/* 底部操作条 */
+.action-bar {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-outline {
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-main);
+}
+
+.btn-outline:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* 健康卡片 (首页) */
+.health-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.h-card {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  position: relative;
+}
+
+.h-card.full-width {
+  grid-column: 1 / -1;
+}
+
+.h-icon {
+  font-size: 22px;
+  margin-bottom: 6px;
+}
+
+.h-label {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+
+.h-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 2px;
+}
+
+.h-unit {
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--text-sub);
+  margin-left: 4px;
+}
+
+.h-time {
+  font-size: 10px;
+  color: #bbb;
+  margin-top: 6px;
+}
+
+/* 统计卡片 */
+.stats-row {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0;
+  text-align: center;
+}
+
+.stat-item h3 {
+  font-size: 18px;
+  color: var(--primary);
+}
+
+.stat-item p {
+  font-size: 11px;
+  color: var(--text-sub);
+  margin-top: 2px;
+}
+
+/* 弹窗 */
+.modal-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-mask.show {
+  display: flex;
+}
+
+.modal {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 20px;
+  width: 90%;
+  max-width: 380px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.modal h3 {
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: var(--text-main);
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.modal-actions button {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.modal-actions button.danger {
+  color: #e53935;
+  border-color: #ffcdd2;
+}
+
+.modal-actions button.primary {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+}

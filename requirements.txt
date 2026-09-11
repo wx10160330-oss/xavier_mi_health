@@ -1,0 +1,4 @@
+aiofiles>=23.0
+mi-fitness>=0.2.0
+
+
