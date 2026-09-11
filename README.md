@@ -57,13 +57,11 @@
 
 ---
 
-### 步骤二(服务器上):扫码登录,拿到 token.json
+### 步骤二:扫码登录,拿到 token.json
 
-这一步是让**小号在服务器上留下一份登录凭证**(token.json),之后 AstrBot 就靠这个凭证去云端拉数据。
+这一步是让**小号留下一份登录凭证**(token.json),之后 AstrBot 就靠这个凭证去云端拉数据。
 
-#### 1. 装依赖
-
-在部署 AstrBot 的服务器上:
+**先装依赖**（不管用哪种方式都要先装）:
 
 ```bash
 # 进入插件目录
@@ -73,35 +71,63 @@ cd data/plugins/mi_health
 pip install -r requirements.txt
 ```
 
-#### 2. 跑扫码登录脚本
+装完依赖后,下面提供**两种登录方式**, 任选其一。推荐先试方法 A, 不行再用方法 B 兜底。
+
+---
+
+#### 方法 A: 双击 bat 脚本 (Windows 本地部署推荐, 最省事)
+
+适合 Windows 本地部署,一键搞定。
+
+1. 先在 AstrBot 面板启用 mi_health 插件, 配置里把 `token_path` 填好 (例如 `C:/mi_token/token.json`,**文件夹要先存在**, `.json` 文件不用提前建)
+2. 进到 `data/plugins/mi_health/tools/` 目录
+3. 双击 `刷新token.bat`
+4. 脚本会自动使用 AstrBot 的 `.venv` 环境, 备份旧 token (如有), 在终端打印二维码
+5. **用小号手机**的微信/系统相机扫码 (⚠️ 不能用小米运动健康 App 内的扫一扫)
+6. 二维码 5 分钟内有效, 手机点"允许登录"
+7. 新 token 自动写入配置里的 `token_path`,不用手动搬
+8. 回 AstrBot 面板点 mi_health 插件「重新加载」即可
+
+> 优点: 傻瓜式, 自动读配置, 自动备份旧 token, token 自动落到配置路径
+> 缺点: 依赖 AstrBot 的 `.venv` 环境, Linux 服务器不适用
+
+---
+
+#### 方法 B: 手动跑 SDK 命令 (Linux 服务器 / 兜底方案)
+
+适合 Linux 服务器部署,或者方法 A 跑不通时的兜底方案。
+
+**1. 跑扫码登录**
+
+有两种子方式:
+
+**B-1: 直接用 SDK 内置命令**（推荐,一行搞定）:
+
+```bash
+python -m mi_fitness.cli
+```
+
+**B-2: 用 SDK 仓库里的示例脚本**（如果 B-1 提示模块不存在）:
 
 ```bash
 # 克隆 SDK 仓库(里面带扫码登录的示例)
 git clone https://github.com/Misty02600/mi-fitness-python.git
 cd mi-fitness-python
-
-# 跑登录脚本(具体文件名以仓库为准,一般叫 login_qr.py 或 examples/login.py)
 python examples/login_qr.py
 ```
 
-脚本跑起来后会生成一个二维码,可能是:
-
-- 直接在终端里用字符画显示
-- 或者保存成图片文件让你下载查看
-- 或者起一个临时的 web 页面让你访问
-
-#### 3. 用小号扫码
+**2. 用小号扫码**
 
 **关键:必须用「手机系统自带的相机」或「微信/浏览器」的扫一扫,千万不要用小米运动健康 App 里的扫一扫**(官方限制,会失败)。
 
-- 用小号所在的那部手机扫这个二维码
+- 用小号所在的那部手机扫二维码
 - 手机上会跳出小米账号登录确认页,点"允许登录"
-- 服务器终端会显示"登录成功",并在当前目录生成一个 **token.json** 文件
+- 终端会显示"登录成功",并在**当前工作目录**生成一个 **token.json** 文件
 
 > ⚠️ 二维码有效期只有 **5 分钟**,超时要重跑
 > ⚠️ 如果部署在国外 VPS 上,扫码可能因为网络问题失败,建议服务器地区选国内或香港
 
-#### 4. 记下 token.json 的绝对路径
+**3. 记下 token.json 的绝对路径**
 
 ```bash
 # 在服务器上跑一下,把绝对路径抄下来
@@ -109,7 +135,7 @@ pwd
 ls -l token.json
 ```
 
-假设显示 `/root/mi-fitness-python/token.json`,这个路径后面配置要填。
+假设显示 `/root/mi-fitness-python/token.json`,这个路径后面在配置里填 `token_path`。
 
 > 🔒 **安全建议**:`chmod 600 token.json` 限制只有你自己能读,防止别的进程偷。
 
@@ -298,46 +324,11 @@ Token 从两种地方拿:
 
 ---
 
-## 🔄 登录 & token 刷新
+## 🔄 token 过期怎么办
 
-无论是**第一次登录**还是 **token 过期需要刷新**, 流程都一样: 扫码 → 生成 token.json → 放到 `token_path` 指定的位置。
+小米云端 token 有效期不固定, 可能几个月也可能几周, 过期后重新走一遍上面的**步骤二**即可（方法 A 或方法 B 都行, 会自动覆盖旧 token）。
 
-下面提供**两种登录方式**, 任选其一, 推荐先试方法 A, 不行再用方法 B 兜底。
-
-### 方法 A: 双击 bat 脚本 (最省事, 推荐)
-
-1. 提前在 AstrBot 面板启用 mi_health 插件, 配置里把 `token_path` 填好 (例如 `C:/mi_token/token.json`, 文件夹要先存在, `.json` 文件不用提前建)
-2. 进到 `data/plugins/mi_health/tools/` 目录
-3. 双击 `刷新token.bat`
-4. 脚本会自动使用 AstrBot 的 `.venv` 环境, 备份旧 token (如有), 在终端打印二维码
-5. **用小号手机**的微信/系统相机扫码 (⚠️ 不能用小米运动健康 App 内的扫一扫)
-6. 二维码 5 分钟内有效, 手机点"允许登录"
-7. 新 token 自动写入配置里的 `token_path`
-8. 回 AstrBot 面板点 mi_health 插件「重新加载」
-
-> 优点: 傻瓜式, 自动读配置, 自动备份旧 token
-> 缺点: 依赖 `.venv` 环境, 环境不对时可能跑不起来
-
-### 方法 B: 手动跑 SDK 原生命令 (兜底方案)
-
-如果方法 A 有问题 (比如找不到 `.venv`、python 环境不对), 直接调用 mi-fitness SDK 自带的登录命令:
-
-```cmd
-cd /d C:\Users\Administrator\Desktop\AstrBot-master
-.venv\Scripts\python.exe -m mi_fitness.cli
-```
-
-或者不用虚拟环境, 只要装了 `mi-fitness` 包也行:
-
-```cmd
-python -m mi_fitness.cli
-```
-
-流程和方法 A 一样, 扫码 → 生成 `token.json`。
-
-**区别**: 方法 B 会把 `token.json` 生成在**当前工作目录**下 (就是你 `cd` 到的那个目录), 不会自动覆盖到 `token_path`。你需要手动把生成的 `token.json` 移动或复制到配置里 `token_path` 指定的位置。
-
-### 怎么知道该刷新了?
+**怎么知道该刷新了?**
 
 - 对话里发 `/health status`, 显示 token 过期
 - `/health` 系列指令报 401 / 未授权
