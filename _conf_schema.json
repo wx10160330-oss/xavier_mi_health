@@ -165,10 +165,16 @@
     "hint": "到点后如果心率还很活跃,劝你早点睡。默认关闭,想被督促再打开"
   },
   "late_night_hour": {
-    "description": "熬夜判定时刻",
+    "description": "熬夜判定起始时刻",
     "type": "string",
     "default": "23:30",
-    "hint": "HH:MM 格式。该时刻后如果心率仍高于日均则触发"
+    "hint": "HH:MM 格式。该时刻后开始监测熬夜"
+  },
+  "late_night_end_hour": {
+    "description": "熬夜判定结束时刻",
+    "type": "string",
+    "default": "05:00",
+    "hint": "HH:MM 格式。该时刻后停止监测熬夜(次日早晨)"
   },
   "late_night_cooldown_hours": {
     "description": "熬夜关怀 冷却（小时）",

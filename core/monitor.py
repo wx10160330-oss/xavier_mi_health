@@ -496,11 +496,11 @@ class HealthMonitor:
         if self.config.get("late_night_care_enabled", False):
             now = datetime.now()
             late_h, late_m = self._parse_hm_tuple(self.config.get("late_night_hour", "23:30"))
-            # 只在晚上23:30-次日凌晨5:00之间判定为熬夜时段
-            in_late_night = (
-                (now.hour > late_h or (now.hour == late_h and now.minute >= late_m)) or  # 今晚晚于起始时间
-                now.hour < 5  # 或次日凌晨0-4点
-            )
+            end_h, end_m = self._parse_hm_tuple(self.config.get("late_night_end_hour", "05:00"))
+            # 熬夜时段: 从 late_night_hour 到次日 late_night_end_hour(跨天)
+            after_start = (now.hour > late_h) or (now.hour == late_h and now.minute >= late_m)
+            before_end = (now.hour < end_h) or (now.hour == end_h and now.minute < end_m)
+            in_late_night = after_start or before_end
             if in_late_night:
                 latest_hr = today.get("latest_hr")
                 avg_hrs = [h["avg_hr"] for h in history if h.get("avg_hr") is not None]
