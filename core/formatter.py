@@ -1,6 +1,7 @@
 """把 SDK 原始数据格式化成人话/上下文注入片段。"""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Optional
 
 
@@ -15,6 +16,58 @@ def _fmt_minutes(m: Optional[int]) -> str:
     if h:
         return f"{h}小时"
     return f"{mm}分"
+
+
+def _extract_data_time(data: Any) -> Optional[str]:
+    """从数据对象里提取"数据更新时间"，格式化为 HH:MM。
+
+    优先级:
+      1. latest_hr.time (最新心率采样时间戳，最能反映"新鲜度")
+      2. 对象.at 属性 (datetime)
+      3. 对象.time 字段 (unix 时间戳)
+    返回 None 表示没拿到。
+    """
+    if data is None:
+        return None
+    # list -> 取第一条
+    if isinstance(data, list):
+        if not data:
+            return None
+        data = data[0]
+
+    def _get(obj, name):
+        if isinstance(obj, dict):
+            return obj.get(name)
+        return getattr(obj, name, None)
+
+    # 优先看 latest_hr.time 或 latest_hr.at (心率数据独有)
+    latest = _get(data, "latest_hr")
+    if latest is not None:
+        at = _get(latest, "at")
+        if isinstance(at, datetime):
+            return at.astimezone().strftime("%H:%M")
+        ts = _get(latest, "time")
+        if isinstance(ts, (int, float)) and ts > 0:
+            try:
+                return datetime.fromtimestamp(int(ts)).strftime("%H:%M")
+            except Exception:
+                pass
+
+    # 次选: 对象自身的 at / time
+    at = _get(data, "at")
+    if isinstance(at, datetime):
+        return at.astimezone().strftime("%H:%M")
+
+    ts = _get(data, "time")
+    if isinstance(ts, (int, float)) and ts > 0:
+        try:
+            dt = datetime.fromtimestamp(int(ts))
+            # time 常常是"当天0点"的时间戳，那样意义不大，只在非0点时才返回
+            if dt.hour != 0 or dt.minute != 0:
+                return dt.strftime("%H:%M")
+        except Exception:
+            pass
+    return None
 
 
 def format_steps(data: Any) -> str:
@@ -211,28 +264,38 @@ def format_period_status(period_status):
 
 def format_for_llm(snapshot: dict, max_length: int = 400, period_status: Optional[dict] = None) -> str:
     date = (snapshot or {}).get("date", "")
-    lines = [f"[用户当前健康快照 · {date}]"]
+    now_str = datetime.now().strftime("%H:%M")
+    lines = [f"[用户当前健康快照 · {date} · 当前时间{now_str}]"]
+
+    def _with_time(line: str, data: Any) -> str:
+        t = _extract_data_time(data)
+        return f"{line} (数据更新于{t})" if t else line
 
     if snapshot:
-        steps_line = format_steps(snapshot.get("steps"))
+        steps_data = snapshot.get("steps")
+        steps_line = format_steps(steps_data)
         if "暂无" not in steps_line:
-            lines.append(steps_line)
+            lines.append(_with_time(steps_line, steps_data))
 
-        hr_line = format_heart_rate(snapshot.get("heart_rate"))
+        hr_data = snapshot.get("heart_rate")
+        hr_line = format_heart_rate(hr_data)
         if "暂无" not in hr_line:
-            lines.append(hr_line)
+            lines.append(_with_time(hr_line, hr_data))
 
-        sleep_line = format_sleep(snapshot.get("sleep"))
+        sleep_data = snapshot.get("sleep")
+        sleep_line = format_sleep(sleep_data)
         if "暂无" not in sleep_line:
-            lines.append(sleep_line)
+            lines.append(_with_time(sleep_line, sleep_data))
 
-        spo2 = format_spo2(snapshot.get("spo2"))
+        spo2_data = snapshot.get("spo2")
+        spo2 = format_spo2(spo2_data)
         if spo2:
-            lines.append(spo2)
+            lines.append(_with_time(spo2, spo2_data))
 
-        vit = format_vitality(snapshot.get("vitality"))
+        vit_data = snapshot.get("vitality")
+        vit = format_vitality(vit_data)
         if vit:
-            lines.append(vit)
+            lines.append(_with_time(vit, vit_data))
 
     # 生理期状态: 让 LLM 知道她是否在经期
     period_line = format_period_status(period_status)
