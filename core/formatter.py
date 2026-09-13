@@ -257,10 +257,10 @@ def format_period_status(period_status):
 
     # 实际经期 > 预测经期 > 排卵日 > 排卵期 > 即将来临
     if in_period and period_day > 0:
-        base = f"🩸 生理期中: 第 {period_day} 天"
+        base = f"🩸 【当前处于生理期第 {period_day} 天】"
         if avg_period_days:
-            base += f" (平均 {avg_period_days} 天)"
-        base += "。可能疲惫/情绪波动/腹部不适, 说话请更温柔, 主动关心她的身体状态。"
+            base += f"(平时约{avg_period_days}天)"
+        base += "。严禁吃冰/喝冷饮/生冷辛辣！她如果说想喝冰的或不舒服，必须立刻温柔阻止并提醒她还在经期，多关心照顾她。"
         return base
 
     if in_period_pred and period_day > 0:
@@ -292,6 +292,11 @@ def format_for_llm(snapshot: dict, max_length: int = 400, period_status: Optiona
         t = _extract_data_time(data)
         return f"{line} (数据更新于{t})" if t else line
 
+    # 生理期状态: 极其重要，放在最前面，防止被截断
+    period_line = format_period_status(period_status)
+    if period_line:
+        lines.insert(1, period_line)
+
     if snapshot:
         steps_data = snapshot.get("steps")
         steps_line = format_steps(steps_data)
@@ -317,11 +322,6 @@ def format_for_llm(snapshot: dict, max_length: int = 400, period_status: Optiona
         vit = format_vitality(vit_data)
         if vit:
             lines.append(_with_time(vit, vit_data))
-
-    # 生理期状态: 让 LLM 知道她是否在经期
-    period_line = format_period_status(period_status)
-    if period_line:
-        lines.append(period_line)
 
     lines.append("(以上为背景常识，不要刻意机械汇报，在日常闲聊、关心或对应场景下自然带出。)")
     text = "\n".join(lines)
