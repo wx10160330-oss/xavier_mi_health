@@ -170,6 +170,21 @@ def extract_daily_metrics(snapshot: dict) -> Optional[dict]:
         if spo2_val is not None and not (70 <= spo2_val <= 100):
             spo2_val = None
 
+    # 尝试提取血氧测量时间戳
+    spo2_time_str = None
+    if spo2 is not None:
+        raw_obj = spo2[0] if isinstance(spo2, list) and spo2 else spo2
+        t = getattr(raw_obj, "time", None) or (raw_obj.get("time") if isinstance(raw_obj, dict) else None)
+        at = getattr(raw_obj, "at", None) or (raw_obj.get("at") if isinstance(raw_obj, dict) else None)
+        try:
+            from datetime import datetime
+            if isinstance(at, datetime):
+                spo2_time_str = at.astimezone().strftime("%H:%M")
+            elif isinstance(t, (int, float)) and t > 0:
+                spo2_time_str = datetime.fromtimestamp(int(t)).strftime("%H:%M")
+        except Exception:
+            pass
+
     day = {
         "date": snapshot.get("date"),
         "max_hr": _val(hr, ["max_hr"]),
@@ -179,6 +194,7 @@ def extract_daily_metrics(snapshot: dict) -> Optional[dict]:
         "sleep_score": _val(sleep, ["score", "sleep_score"]),
         "sleep_duration": _val(sleep, ["duration", "total_duration"]),
         "spo2": spo2_val,
+        "spo2_time": spo2_time_str,
         "steps": _val(steps, ["steps"]),
     }
 
@@ -485,11 +501,13 @@ class HealthMonitor:
         if self.config.get("spo2_care_enabled", True):
             abs_th = int(self.config.get("spo2_abs_threshold", 93))
             spo2 = today.get("spo2")
+            spo2_time = today.get("spo2_time")
             if spo2 is not None and spo2 < abs_th:
+                time_prefix = f"（{spo2_time}）" if spo2_time else ""
                 alerts.append({
                     "key": "spo2",
                     "type": "血氧偏低",
-                    "hint": f"血氧只有 {spo2}% 有点低",
+                    "hint": f"今天{time_prefix}血氧只有 {spo2}% 有点低",
                 })
 
         # 熬夜提醒
