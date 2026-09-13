@@ -158,8 +158,29 @@ def format_sleep(data: Any) -> str:
     score = _g(data, "score", "sleep_score")
     deep = _g(data, "deep_sleep_duration", "sleep_deep_duration", "deep_sleep")
     light = _g(data, "light_sleep_duration", "sleep_light_duration", "light_sleep")
+    segments = _g(data, "segment_details")
 
     parts = []
+    
+    # 尝试提取入睡/醒来时间(从 segment_details 最新一条)
+    bedtime_str, wakeup_str = None, None
+    if segments and isinstance(segments, list) and len(segments) > 0:
+        # 取最新一段(通常就一条主睡眠)
+        seg = segments[0] if not isinstance(segments[0], dict) else segments[0]
+        bedtime_ts = _g(seg, "bedtime")
+        wakeup_ts = _g(seg, "wake_up_time")
+        try:
+            from datetime import datetime
+            if bedtime_ts and isinstance(bedtime_ts, (int, float)) and bedtime_ts > 0:
+                bedtime_str = datetime.fromtimestamp(int(bedtime_ts)).strftime("%H:%M")
+            if wakeup_ts and isinstance(wakeup_ts, (int, float)) and wakeup_ts > 0:
+                wakeup_str = datetime.fromtimestamp(int(wakeup_ts)).strftime("%H:%M")
+        except Exception:
+            pass
+
+    # 组装: 入睡→醒来 时长
+    if bedtime_str and wakeup_str:
+        parts.append(f"{bedtime_str}→{wakeup_str}")
     if dur is not None:
         parts.append(_fmt_minutes(dur))
     if score is not None:
